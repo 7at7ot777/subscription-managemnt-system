@@ -260,7 +260,21 @@ compatible.
 
 ### Credentials
 
-Per-tenant credentials are optional; blank fields inherit the central connection.
+**The panel exposes no host, port, username or password fields.** Every tenant lives on
+the same server as the central database, so those would always duplicate the central
+connection — while putting a decrypted password into Livewire's page payload for no gain.
+
+The `tenancy_db_host`, `tenancy_db_port`, `tenancy_db_username` and `tenancy_db_password`
+columns still exist, unset, as an escape hatch: moving one heavy tenant onto its own
+server later is then a data change rather than a code change. They stay encrypted and
+hidden on the model, so populating one via tinker remains safe.
+
+Note that username and password are inert with the current `MySQLDatabaseManager`:
+`DatabaseConfig::makeCredentials()` only generates them when the manager implements
+`ManagesDatabaseUsers`. To make them meaningful, switch
+`tenancy.database.managers.mysql` to `PermissionControlledMySQLDatabaseManager`, which
+creates a MySQL user per tenant with grants scoped to that tenant's database — real
+defence in depth, at the cost of needing `CREATE USER`/`GRANT` on the central user.
 
 The column names are **not** arbitrary — stancl scans the tenant's raw attributes for
 keys prefixed `tenancy_db_`, strips the prefix and merges the rest into the connection

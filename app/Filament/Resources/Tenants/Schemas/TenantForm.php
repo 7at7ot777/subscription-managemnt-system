@@ -35,50 +35,32 @@ class TenantForm
 
                     TextInput::make('slug')
                         ->required()
-                        ->maxLength(63)
+                        ->maxLength((int) config('tenancy.slug.max', 50))
                         ->live(onBlur: true)
-                        // The slug is part of the tenant's public URL contract, and the
-                        // tenant database is named from the immutable id, so renaming is
-                        // an operation in its own right rather than a form edit.
+                        // The slug is the tenant's public URL and the source of its
+                        // database name, so renaming it is an operation in its own right
+                        // rather than a form edit.
                         ->disabledOn('edit')
                         ->rules(fn (?Tenant $record) => TenantSlugRules::make($record?->getKey()))
                         ->helperText(fn (Get $get): string => rtrim((string) config('app.url'), '/')
                             .'/'.($get('slug') ?: '{slug}').'/app'),
-                ]),
 
-            Section::make('Database configuration')
-                ->description('Leave blank to inherit the central connection. Column names map to stancl internals and must keep the tenancy_db_ prefix.')
-                ->columns(2)
-                ->schema([
-                    // Read-only on purpose. The name is derived from the slug at
-                    // provisioning time and then frozen into the column. Editing it
-                    // afterwards would not rename the physical database — stancl has no
-                    // rename operation — it would simply repoint the connection at a
-                    // database that does not exist, orphaning the tenant's data.
+                    // Shown for debugging only, never written.
+                    //
+                    // There are no host/port/username/password fields: every tenant lives
+                    // on the same server as the central database, so those would always
+                    // duplicate the central connection. The columns still exist (and are
+                    // still encrypted and hidden) as an escape hatch for moving a tenant
+                    // to its own server later, but exposing them in the UI bought nothing
+                    // and put the decrypted password into Livewire's page payload.
                     TextInput::make('tenancy_db_name')
-                        ->label('Database name')
+                        ->label('Database')
                         ->disabled()
                         ->dehydrated(false)
                         ->placeholder(fn (Get $get): string => config('tenancy.database.prefix')
                             .($get('slug') ?: '{slug}')
                             .config('tenancy.database.suffix'))
-                        ->helperText('Derived from the slug when the tenant is provisioned.'),
-
-                    TextInput::make('tenancy_db_host')->label('Host')->maxLength(255),
-                    TextInput::make('tenancy_db_port')->label('Port')->numeric(),
-                    TextInput::make('tenancy_db_username')->label('Username')->maxLength(255),
-
-                    // SECURITY: never pre-filled and never dehydrated when blank.
-                    // The model hides this attribute, so it is absent from the record
-                    // data Filament fills the form with, and therefore absent from the
-                    // Livewire snapshot that is serialised into the page HTML.
-                    TextInput::make('tenancy_db_password')
-                        ->label('Password')
-                        ->password()
-                        ->revealable(false)
-                        ->autocomplete('new-password')
-                        ->dehydrated(fn (?string $state): bool => filled($state))
-                        ->helperText('Leave blank to keep the current password.'),
+                        ->helperText('Created from the slug when the tenant is provisioned.'),
                 ]),
 
             Section::make('Subscription')
