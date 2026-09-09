@@ -25,3 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local tenant SQLite databases (unused; the app runs on MySQL)
+*.sqlite
+*.sqlite-journal

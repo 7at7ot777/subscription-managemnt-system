@@ -2,12 +2,21 @@
 
 declare(strict_types=1);
 
-use Stancl\Tenancy\Database\Models\Domain;
 use App\Models\Tenant;
+use App\Tenancy\Bootstrappers\DatabaseCacheTenancyBootstrapper;
+use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
+use Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper;
+use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
+use Stancl\Tenancy\Database\Models\Domain;
+use Stancl\Tenancy\Features\UserImpersonation;
+use Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager;
+use Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLDatabaseManager;
+use Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager;
+use Stancl\Tenancy\UUIDGenerator;
 
 return [
     'tenant_model' => Tenant::class,
-    'id_generator' => Stancl\Tenancy\UUIDGenerator::class,
+    'id_generator' => UUIDGenerator::class,
 
     'domain_model' => Domain::class,
 
@@ -28,10 +37,10 @@ return [
      * To configure their behavior, see the config keys below.
      */
     'bootstrappers' => [
-        Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class,
-        Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
-        Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
-        Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
+        DatabaseTenancyBootstrapper::class,
+        DatabaseCacheTenancyBootstrapper::class, // DatabaseStore is not taggable; see class docblock.
+        FilesystemTenancyBootstrapper::class,
+        QueueTenancyBootstrapper::class,
         // Stancl\Tenancy\Bootstrappers\RedisTenancyBootstrapper::class, // Note: phpredis is needed
     ],
 
@@ -51,17 +60,17 @@ return [
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
          */
-        'prefix' => 'tenant',
+        'prefix' => env('TENANCY_DB_PREFIX', 'tenant'),
         'suffix' => '',
 
         /**
          * TenantDatabaseManagers are classes that handle the creation & deletion of tenant databases.
          */
         'managers' => [
-            'sqlite' => Stancl\Tenancy\TenantDatabaseManagers\SQLiteDatabaseManager::class,
-            'mysql' => Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager::class,
-            'mariadb' => Stancl\Tenancy\TenantDatabaseManagers\MySQLDatabaseManager::class,
-            'pgsql' => Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLDatabaseManager::class,
+            'sqlite' => SQLiteDatabaseManager::class,
+            'mysql' => MySQLDatabaseManager::class,
+            'mariadb' => MySQLDatabaseManager::class,
+            'pgsql' => PostgreSQLDatabaseManager::class,
 
         /**
          * Use this database manager for MySQL to have a DB user created for each tenant database.
@@ -136,7 +145,7 @@ return [
          * disable asset() helper tenancy and explicitly use tenant_asset() calls in places
          * where you want to use tenant-specific assets (product images, avatars, etc).
          */
-        'asset_helper_tenancy' => true,
+        'asset_helper_tenancy' => false, // Filament builds asset URLs with asset(); rewriting them 404s the panel.
     ],
 
     /**
@@ -164,7 +173,7 @@ return [
      * understand which ones you want to enable.
      */
     'features' => [
-        // Stancl\Tenancy\Features\UserImpersonation::class,
+        UserImpersonation::class,
         // Stancl\Tenancy\Features\TelescopeTags::class,
         // Stancl\Tenancy\Features\UniversalRoutes::class,
         // Stancl\Tenancy\Features\TenantConfig::class, // https://tenancyforlaravel.com/docs/v3/features/tenant-config
@@ -196,5 +205,31 @@ return [
     'seeder_parameters' => [
         '--class' => 'DatabaseSeeder', // root seeder class
         // '--force' => true, // This needs to be true to seed tenant databases in production
+    ],
+    /**
+     * Slugs that may never identify a tenant, because they would shadow a real
+     * top-level route. Derived from `php artisan route:list` plus the paths this
+     * application introduces. Enforced by App\Rules\TenantSlugRules.
+     */
+    'reserved_slugs' => [
+        'admin', 'api', 'app', 'assets', 'build', 'css', 'filament', 'fonts',
+        'horizon', 'images', 'impersonate', 'js', 'livewire', 'login', 'logout',
+        'nova', 'password', 'pulse', 'register', 'sanctum', 'storage', 'telescope',
+        'tenancy', 'up', 'vendor',
+    ],
+
+    'slug' => [
+        'min' => 3,
+        'max' => 63,
+    ],
+
+    /**
+     * Routes that stay reachable when a subscription is expired or has not started.
+     * Without these, the user is locked out of the pages that explain the problem.
+     */
+    'subscription_exempt_routes' => [
+        'tenant.subscription.expired',
+        'tenant.impersonation.*',
+        'filament.tenant.auth.*',
     ],
 ];

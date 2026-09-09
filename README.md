@@ -1,11 +1,48 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Subscription Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A multi-tenant Laravel application. Each tenant has its own database, its own users and
+its own subscription window; a central super-admin panel manages them all.
+
+- **Tenant app:** `https://example.com/{tenant}/app` — Filament panel, per-tenant database
+- **Super admin:** `https://example.com/admin` — Filament panel, central database
+
+**[Read the architecture documentation →](docs/multi-tenancy.md)**
+
+## Requirements
+
+- PHP **8.4+** (Laravel 13 depends on Symfony 8, which requires `>= 8.4.1`)
+- MySQL 8
+- Composer 2
+
+## Quick start
+
+```sh
+mysql -uroot -e "CREATE DATABASE sms_central; CREATE DATABASE sms_testing;"
+
+composer install
+cp .env.example .env && php artisan key:generate
+php artisan migrate
+php artisan filament:assets
+
+php artisan super-admin:create
+php artisan tenant:create Acme acme \
+    --admin-name="Acme Admin" --admin-email=admin@acme.test --admin-password='Sup3rSecret!23'
+
+php artisan serve
+```
+
+Then sign in at `/admin` as the super admin, or at `/acme/app` as the tenant admin.
+
+## Tests
+
+```sh
+php artisan test                          # runs against real MySQL
+php artisan tenant:prune-test-databases   # cleanup after an interrupted run
+```
+
+---
+
+<p align="center">Built on Laravel</p>
 
 ## About Laravel
 

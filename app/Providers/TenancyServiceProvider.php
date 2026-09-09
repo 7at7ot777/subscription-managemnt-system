@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Http\Middleware\InitializeTenancyBySlugPath;
+use App\Listeners\SetTenantUrlDefaults;
+use App\Tenancy\Resolvers\SlugTenantResolver;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -12,6 +16,7 @@ use Stancl\Tenancy\Events;
 use Stancl\Tenancy\Jobs;
 use Stancl\Tenancy\Listeners;
 use Stancl\Tenancy\Middleware;
+use Stancl\Tenancy\Resolvers\PathTenantResolver;
 
 class TenancyServiceProvider extends ServiceProvider
 {
@@ -27,14 +32,9 @@ class TenancyServiceProvider extends ServiceProvider
                 JobPipeline::make([
                     Jobs\CreateDatabase::class,
                     Jobs\MigrateDatabase::class,
-                    // Jobs\SeedDatabase::class,
-
-                    // Your own jobs to prepare the tenant.
-                    // Provision API keys, create S3 buckets, anything you want!
-
                 ])->send(function (Events\TenantCreated $event) {
                     return $event->tenant;
-                })->shouldBeQueued(false), // `false` by default, but you probably want to make this `true` for production.
+                })->shouldBeQueued(false), // Synchronous so CreateTenantAction can catch failures.
             ],
             Events\SavingTenant::class => [],
             Events\TenantSaved::class => [],
@@ -46,18 +46,8 @@ class TenancyServiceProvider extends ServiceProvider
                     Jobs\DeleteDatabase::class,
                 ])->send(function (Events\TenantDeleted $event) {
                     return $event->tenant;
-                })->shouldBeQueued(false), // `false` by default, but you probably want to make this `true` for production.
+                })->shouldBeQueued(false),
             ],
-
-            // Domain events
-            Events\CreatingDomain::class => [],
-            Events\DomainCreated::class => [],
-            Events\SavingDomain::class => [],
-            Events\DomainSaved::class => [],
-            Events\UpdatingDomain::class => [],
-            Events\DomainUpdated::class => [],
-            Events\DeletingDomain::class => [],
-            Events\DomainDeleted::class => [],
 
             // Database events
             Events\DatabaseCreated::class => [],
@@ -70,6 +60,8 @@ class TenancyServiceProvider extends ServiceProvider
             Events\InitializingTenancy::class => [],
             Events\TenancyInitialized::class => [
                 Listeners\BootstrapTenancy::class,
+                // Must run after bootstrapping so the tenant is fully resolved.
+                SetTenantUrlDefaults::class,
             ],
 
             Events\EndingTenancy::class => [],
@@ -87,14 +79,14 @@ class TenancyServiceProvider extends ServiceProvider
                 Listeners\UpdateSyncedResource::class,
             ],
 
-            // Fired only when a synced resource is changed in a different DB than the origin DB (to avoid infinite loops)
             Events\SyncedResourceChangedInForeignDatabase::class => [],
         ];
     }
 
     public function register()
     {
-        //
+        // Anything resolving the path resolver gets the slug-based one instead.
+        $this->app->bind(PathTenantResolver::class, SlugTenantResolver::class);
     }
 
     public function boot()
@@ -128,12 +120,17 @@ class TenancyServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Tenancy must resolve before anything that touches the database or the session.
+     * Stancl's own list is hardcoded to its five middleware, so the slug-path
+     * middleware has to be prepended here as well.
+     */
     protected function makeTenancyMiddlewareHighestPriority()
     {
         $tenancyMiddleware = [
-            // Even higher priority than the initialization middleware
             Middleware\PreventAccessFromCentralDomains::class,
 
+            InitializeTenancyBySlugPath::class,
             Middleware\InitializeTenancyByDomain::class,
             Middleware\InitializeTenancyBySubdomain::class,
             Middleware\InitializeTenancyByDomainOrSubdomain::class,
@@ -142,7 +139,7 @@ class TenancyServiceProvider extends ServiceProvider
         ];
 
         foreach (array_reverse($tenancyMiddleware) as $middleware) {
-            $this->app[\Illuminate\Contracts\Http\Kernel::class]->prependToMiddlewarePriority($middleware);
+            $this->app[Kernel::class]->prependToMiddlewarePriority($middleware);
         }
     }
 }

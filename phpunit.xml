@@ -23,12 +23,36 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+
+        <!--
+            Real MySQL, not SQLite :memory:. Tenant isolation is the thing under test and
+            it depends on CREATE DATABASE, which an in-memory SQLite database cannot model.
+        -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_DATABASE" value="sms_testing"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
         <env name="DB_URL" value=""/>
+        <env name="DB_QUEUE_CONNECTION" value="mysql"/>
+
+        <!--
+            Tenant databases created during tests are prefixed so the cleanup sweep can
+            never match a real tenant database.
+        -->
+        <env name="TENANCY_DB_PREFIX" value="testtenant"/>
+
+        <!--
+            Database sessions, NOT the array driver. The array driver hands every request a
+            fresh empty session, which would make cross-tenant session bleed impossible to
+            reproduce — the single most important thing this suite has to prove.
+        -->
+        <env name="SESSION_DRIVER" value="database"/>
+        <env name="SESSION_CONNECTION" value="mysql"/>
+
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
