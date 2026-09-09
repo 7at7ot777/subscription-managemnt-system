@@ -6,12 +6,14 @@ namespace App\Providers;
 
 use App\Http\Middleware\InitializeTenancyBySlugPath;
 use App\Listeners\SetTenantUrlDefaults;
+use App\Models\Tenant;
 use App\Tenancy\Resolvers\SlugTenantResolver;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Stancl\JobPipeline\JobPipeline;
+use Stancl\Tenancy\DatabaseConfig;
 use Stancl\Tenancy\Events;
 use Stancl\Tenancy\Jobs;
 use Stancl\Tenancy\Listeners;
@@ -87,6 +89,17 @@ class TenancyServiceProvider extends ServiceProvider
     {
         // Anything resolving the path resolver gets the slug-based one instead.
         $this->app->bind(PathTenantResolver::class, SlugTenantResolver::class);
+
+        // Name tenant databases after the slug rather than the UUID, so `tenant_acme`
+        // appears in SHOW DATABASES, backups, slow-query logs and monitoring instead of
+        // `tenant_9f8c...`. The slug is immutable after creation, so the name stays
+        // stable; stancl freezes the result into tenancy_db_name at provisioning time,
+        // meaning existing tenants keep whatever name they were created with.
+        DatabaseConfig::generateDatabaseNamesUsing(
+            static fn (Tenant $tenant): string => config('tenancy.database.prefix')
+                .$tenant->slug
+                .config('tenancy.database.suffix'),
+        );
     }
 
     public function boot()

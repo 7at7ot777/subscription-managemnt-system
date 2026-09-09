@@ -50,10 +50,19 @@ class TenantForm
                 ->description('Leave blank to inherit the central connection. Column names map to stancl internals and must keep the tenancy_db_ prefix.')
                 ->columns(2)
                 ->schema([
+                    // Read-only on purpose. The name is derived from the slug at
+                    // provisioning time and then frozen into the column. Editing it
+                    // afterwards would not rename the physical database — stancl has no
+                    // rename operation — it would simply repoint the connection at a
+                    // database that does not exist, orphaning the tenant's data.
                     TextInput::make('tenancy_db_name')
                         ->label('Database name')
-                        ->maxLength(64)
-                        ->helperText('Defaults to the configured prefix plus the tenant id.'),
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->placeholder(fn (Get $get): string => config('tenancy.database.prefix')
+                            .($get('slug') ?: '{slug}')
+                            .config('tenancy.database.suffix'))
+                        ->helperText('Derived from the slug when the tenant is provisioned.'),
 
                     TextInput::make('tenancy_db_host')->label('Host')->maxLength(255),
                     TextInput::make('tenancy_db_port')->label('Port')->numeric(),

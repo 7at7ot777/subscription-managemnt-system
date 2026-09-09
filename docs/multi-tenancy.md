@@ -238,6 +238,28 @@ untouched and "leave" simply returns them to `/admin`.
 
 ## 9. Handling tenant database credentials
 
+### Database naming
+
+Tenant databases are named **`tenant_<slug>`** — `tenant_acme`, `tenant_hathout` — rather
+than after the tenant's UUID. That is what appears in `SHOW DATABASES`, backups,
+slow-query logs and monitoring, so a readable name is worth having.
+
+The name is produced by `DatabaseConfig::generateDatabaseNamesUsing()`, registered in
+`TenancyServiceProvider::register()`, and stancl freezes the result into
+`tenancy_db_name` at provisioning time. The slug is immutable after creation, so the
+name never drifts from the physical database.
+
+The **Database name field is read-only in the panel, deliberately**. stancl has no rename
+operation — only create, delete, migrate and seed — so editing the column would not
+rename anything. It would simply repoint the connection at a database that does not
+exist, leaving the tenant's real data orphaned and every request returning 503.
+
+`config('tenancy.slug.max')` is capped at 50 because MySQL limits identifiers to 64
+characters and the name is prefix + slug; `TenantManagementTest` asserts the two stay
+compatible.
+
+### Credentials
+
 Per-tenant credentials are optional; blank fields inherit the central connection.
 
 The column names are **not** arbitrary — stancl scans the tenant's raw attributes for

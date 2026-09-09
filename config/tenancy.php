@@ -60,7 +60,7 @@ return [
          * Tenant database names are created like this:
          * prefix + tenant_id + suffix.
          */
-        'prefix' => env('TENANCY_DB_PREFIX', 'tenant'),
+        'prefix' => env('TENANCY_DB_PREFIX', 'tenant_'),
         'suffix' => '',
 
         /**
@@ -220,7 +220,9 @@ return [
 
     'slug' => [
         'min' => 3,
-        'max' => 63,
+        // The tenant database is named prefix + slug and MySQL caps identifiers
+        // at 64 characters, so this must leave room for the longest prefix.
+        'max' => 50,
     ],
 
     /**

@@ -41,7 +41,7 @@
             Tenant databases created during tests are prefixed so the cleanup sweep can
             never match a real tenant database.
         -->
-        <env name="TENANCY_DB_PREFIX" value="testtenant"/>
+        <env name="TENANCY_DB_PREFIX" value="testtenant_"/>
 
         <!--
             Database sessions, NOT the array driver. The array driver hands every request a

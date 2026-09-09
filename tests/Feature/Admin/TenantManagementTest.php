@@ -141,6 +141,31 @@ class TenantManagementTest extends TestCase
     }
 
     #[Test]
+    public function the_tenant_database_is_named_after_the_slug(): void
+    {
+        // Readable names matter operationally: they are what shows up in
+        // SHOW DATABASES, backups, slow-query logs and monitoring.
+        $tenant = $this->provisionTenant('acme');
+
+        $expected = config('tenancy.database.prefix').'acme'.config('tenancy.database.suffix');
+
+        $this->assertSame($expected, $tenant->database()->getName());
+        $this->assertSame($expected, $tenant->tenancy_db_name);
+    }
+
+    #[Test]
+    public function the_database_name_stays_within_the_mysql_identifier_limit(): void
+    {
+        // The name is prefix + slug, and MySQL caps identifiers at 64 characters, so
+        // the slug length rule has to leave room for the longest prefix.
+        $longest = config('tenancy.database.prefix')
+            .str_repeat('a', (int) config('tenancy.slug.max'))
+            .config('tenancy.database.suffix');
+
+        $this->assertLessThanOrEqual(64, strlen($longest));
+    }
+
+    #[Test]
     public function a_failed_provisioning_never_leaves_the_tenant_active(): void
     {
         // The tenant row is deliberately kept so the operator can see what failed,
